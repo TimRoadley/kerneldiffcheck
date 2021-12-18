@@ -1,0 +1,5 @@
+#!/bin/bash
+#cp config.parallax .config
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- oldconfig
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi-
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- modules

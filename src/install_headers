@@ -1,0 +1,2 @@
+#!/bin/bash
+make headers_install ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- INSTALL_HDR_PATH=../headers

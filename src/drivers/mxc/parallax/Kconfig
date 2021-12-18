@@ -1,0 +1,32 @@
+#
+# Bluetooth configuration
+#
+
+menu "ParkAssist PARALLAX Project support"
+
+config PA_PARALLAX_PROJECT
+        tristate "Parallax Project"
+        default y
+	---help---
+         Enable ParkAssist Parallax Project support.
+
+config PA_PARALLAX_LEDS
+	depends on PA_PARALLAX_PROJECT
+	tristate "PArallax LED board support"
+        default y
+	---help---
+         Say Y to get the ParkAssist LED board support.
+
+config PA_PARALLAX_REDUCED_MEM
+        tristate "Parallax Reduced Memory Size"
+        default y
+	---help---
+         Say Y to configure with reduced memory size (256MB).
+
+config PA_SYSTEM_RESET_CONTROLLER
+        tristate "Parallax System Reset Controller"
+        default y
+        ---help---
+         Say Y to configure system reset controller driver.
+
+endmenu
