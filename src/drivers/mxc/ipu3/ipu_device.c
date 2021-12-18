@@ -1104,10 +1104,8 @@ static int prepare_task(struct ipu_task_entry *t)
 	int ret = 0;
 
 	ret = check_task(t);
-	if (ret > IPU_CHECK_ERR_MIN) {
-		printk(KERN_INFO "mxc_ipu: preapre_task IPU_ERR: %d\n", ret);
+	if (ret > IPU_CHECK_ERR_MIN)
 		return -EINVAL;
-	}
 
 	if (t->set.mode & VDI_MODE) {
 		if (t->task_id != IPU_TASK_ID_VF)
@@ -2481,6 +2479,7 @@ static void do_task_release(struct ipu_task_entry *t, int fail)
 	int ret;
 	struct ipu_soc *ipu = t->ipu;
 
+//	printk(KERN_INFO "MXC IPU: do_task_release started\n");
 	if (t->input.deinterlace.enable && !fail &&
 			(t->task_no & (UP_STRIPE | DOWN_STRIPE)))
 		vdi_split_process(ipu, t);
@@ -2544,6 +2543,7 @@ static void do_task_release(struct ipu_task_entry *t, int fail)
 
 	t->state = STATE_OK;
 	CHECK_PERF(&t->ts_rel);
+//	printk(KERN_INFO "MXC IPU: do_task_release done\n");
 	return;
 }
 
@@ -2841,6 +2841,7 @@ chan_setup:
 	if (t->set.mode & VDOA_BAND_MODE)
 		vdoa_stop(t->vdoa_handle);
 	do_task_release(t, t->state >= STATE_ERR);
+//	printk(KERN_INFO "MXC IPU: do_task: released\n");
 	return;
 }
 
@@ -3259,9 +3260,8 @@ int ipu_queue_task(struct ipu_task *task)
 
 	CHECK_PERF(&tsk->ts_queue);
 	ret = prepare_task(tsk);
-	if (ret < 0) {
+	if (ret < 0)
 		goto done;
-        }
 
 	if (need_split(tsk)) {
 		CHECK_PERF(&tsk->ts_dotask);
@@ -3415,6 +3415,7 @@ static long mxc_ipu_ioctl(struct file *file,
 		{
                         struct ipu_task task;
 			struct ipu_alloc_list *mem;
+
                         if (copy_from_user
                                         (&task, (struct ipu_task *) arg,
                                          sizeof(struct ipu_task)))
@@ -3425,11 +3426,14 @@ static long mxc_ipu_ioctl(struct file *file,
 
                         mem->size = PAGE_ALIGN(task.input.width*task.input.height*2);
 			mem->phy_addr = task.input.paddr;
+                        mem->cpu_addr = NULL;
+#if 0
                         mem->cpu_addr = ioremap(mem->phy_addr, mem->size);
                         if (mem->cpu_addr == NULL) {
                                 kfree(mem);
                                 return -ENOMEM;
                         }
+#endif
                         mem->file_index = file->private_data;
                         mutex_lock(&ipu_alloc_lock);
                         list_add(&mem->list, &ipu_alloc_list);
@@ -3482,7 +3486,8 @@ static long mxc_ipu_ioctl(struct file *file,
                         list_for_each_entry(mem, &ipu_alloc_list, list) {
                                 if (mem->phy_addr == offset) {
                                         list_del(&mem->list);
-					iounmap(mem->cpu_addr);
+                                        if(mem->cpu_addr != NULL)
+					    iounmap(mem->cpu_addr);
                                         kfree(mem);
                                         ret = 0;
                                         break;
@@ -3540,10 +3545,12 @@ static int mxc_ipu_release(struct inode *inode, struct file *file)
 	struct ipu_alloc_list *mem;
 	struct ipu_alloc_list *n;
 
+        printk("MXC_IPU: RELEASE CALL\n");
 	mutex_lock(&ipu_alloc_lock);
 	list_for_each_entry_safe(mem, n, &ipu_alloc_list, list) {
 		if ((mem->cpu_addr != 0) &&
 			(file->private_data == mem->file_index)) {
+                        printk("MXC_IPU: LIST DEL\n");
 			list_del(&mem->list);
 			dma_free_coherent(ipu_dev,
 					  mem->size,

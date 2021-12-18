@@ -105,12 +105,12 @@ static void hdmi_audio_abort_stream(struct snd_pcm_substream *substream)
 {
 	unsigned long flags;
 
-	snd_pcm_stream_lock_irqsave(substream, flags);
+//	snd_pcm_stream_lock_irqsave(substream, flags);
 
 	if (snd_pcm_running(substream))
 		substream->ops->trigger(substream, SNDRV_PCM_TRIGGER_STOP);
 
-	snd_pcm_stream_unlock_irqrestore(substream, flags);
+//	snd_pcm_stream_unlock_irqrestore(substream, flags);
 }
 
 int mxc_hdmi_abort_stream(void)
@@ -147,7 +147,7 @@ int mxc_hdmi_register_audio(struct snd_pcm_substream *substream)
 	unsigned long flags, flags1;
 	int ret = 0;
 
-	snd_pcm_stream_lock_irqsave(substream, flags);
+//	snd_pcm_stream_lock_irqsave(substream, flags);
 
 	if (substream && check_hdmi_state()) {
 		spin_lock_irqsave(&hdmi_audio_lock, flags1);
@@ -160,7 +160,7 @@ int mxc_hdmi_register_audio(struct snd_pcm_substream *substream)
 	} else
 		ret = -EINVAL;
 
-	snd_pcm_stream_unlock_irqrestore(substream, flags);
+//	snd_pcm_stream_unlock_irqrestore(substream, flags);
 
 	return ret;
 }

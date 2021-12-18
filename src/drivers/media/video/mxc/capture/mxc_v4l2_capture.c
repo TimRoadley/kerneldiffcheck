@@ -568,75 +568,6 @@ static int mxc_streamon(cam_data *cam)
 	return err;
 }
 
-
-
-/*!
- * Start the encoder job without allocating frame queues
- *
- * @param cam      structure cam_data *
- *
- * @return status  0 Success
- */
-static int mxc_streamon_lazy(cam_data *cam)
-{
-	struct mxc_v4l_frame *frame;
-	unsigned long lock_flags;
-	int err = 0;
-
-	pr_debug("In MVC:mxc_streamon\n");
-
-	if (NULL == cam) {
-		printk("ERROR! cam parameter is NULL\n");
-		return -1;
-	}
-
-	if (cam->capture_on) {
-		printk("ERROR: v4l2 capture: Capture stream has been turned "
-		       " on\n");
-		return -1;
-	}
-
-	if (list_empty(&cam->ready_q)) {
-		printk("ERROR: v4l2 capture: mxc_streamon buffer has not been "
-			"queued yet\n");
-		return -EINVAL;
-	}
-	if (cam->enc_update_eba &&
-		cam->ready_q.prev == cam->ready_q.next) {
-		printk("ERROR: v4l2 capture: mxc_streamon buffer need ping pong "
-			"at least two buffers\n");
-		return -EINVAL;
-	}
-
-	cam->capture_pid = current->pid;
-
-	if (cam->overlay_on == true)
-		stop_preview(cam);
-
-	if (cam->enc_enable) {
-		err = cam->enc_enable(cam);
-		if (err != 0) {
-			printk("ERROR: Encoder enable failed\n");
-			return err;
-		}
-	}
-
-	if (cam->overlay_on == true)
-		start_preview(cam);
-
-	if (cam->enc_enable_csi) {
-		err = cam->enc_enable_csi(cam);
-		if (err != 0) {
-			printk("ERROR: Encoder enable CSI failed\n");
-			return err;
-		}
-	}
-
-	cam->capture_on = true;
-
-	return err;
-}
-
 /*!
  * Shut down the encoder job
  *
@@ -1979,7 +1910,8 @@ static int mxc_v4l_open(struct file *file)
 
 	if (cam->sensor == NULL ||
 	    cam->sensor->type != v4l2_int_type_slave) {
-		pr_err("ERROR: v4l2 capture: open: slave not found!\n");
+		pr_err("ERROR: v4l2 capture: open: slave not found for sensor_index: %d!, cam: %p, sensor: %p\n", 
+                      cam->sensor_index, cam, cam->sensor);
 		return -EAGAIN;
 	}
 
@@ -2438,7 +2370,7 @@ static long mxc_v4l_do_ioctl(struct file *file,
 				      &cam->ready_q);
 		} else if (cam->frame[index].buffer.
 			   flags & V4L2_BUF_FLAG_QUEUED) {
-			pr_err(KERN_INFO "ERROR: v4l2 capture: VIDIOC_QBUF: "
+			printk(KERN_INFO "ERROR: v4l2 capture: VIDIOC_QBUF: "
 			       "buffer already queued: %d, flags: %X\n", index, cam->frame[index].buffer.flags);
                         if (index < PARALLAX_VPU_BUF_NUM)
                             cam->snapshot.buffer_control[index] |= PARALLAX_SNAPSHOT_BUF_MODE_ERR;
@@ -2446,7 +2378,7 @@ static long mxc_v4l_do_ioctl(struct file *file,
 			retval = -EINVAL;
 		} else if (cam->frame[index].buffer.
 			   flags & V4L2_BUF_FLAG_DONE) {
-			pr_err("ERROR: v4l2 capture: VIDIOC_QBUF: "
+			printk("ERROR: v4l2 capture: VIDIOC_QBUF: "
 			       "overwrite done buffer: %d, flags: %X.\n", index, cam->frame[index].buffer.flags);
 			cam->frame[index].buffer.flags &=
 			    ~V4L2_BUF_FLAG_DONE;
@@ -2506,15 +2438,6 @@ static long mxc_v4l_do_ioctl(struct file *file,
 	case VIDIOC_STREAMON: {
 		pr_debug("   case VIDIOC_STREAMON\n");
 		retval = mxc_streamon(cam);
-		break;
-	}
-
-	/*!
-	 * V4l2 VIDIOC_STREAMON_LAZY ioctl
-	 */
-	case VIDIOC_STREAMON_LAZY: {
-		pr_debug("   case VIDIOC_STREAMON_LAZY\n");
-		retval = mxc_streamon_lazy(cam);
 		break;
 	}
 
@@ -3434,12 +3357,12 @@ static int mxc_v4l2_master_attach(struct v4l2_int_device *slave)
 	int i;
 	struct sensor_data *sdata = slave->priv;
 
-	printk(KERN_INFO "MXC_V4L: Master Attach: %s, Sensor Data CSI: %d, Camera Data CSI: %d\n", 
-			slave->name, sdata->csi, cam->csi);
+	printk(KERN_INFO "MXC_V4L: Master Attach: %s, Sensor Data CSI: %d, Camera Data CSI: %d, cam: %p, slave: %p\n", 
+			slave->name, sdata->csi, cam->csi, cam, slave);
 	pr_debug("In MVC: mxc_v4l2_master_attach\n");
 	pr_debug("   slave.name = %s\n", slave->name);
 	pr_debug("   master.name = %s\n", slave->u.slave->master->name);
-	//printk(KERN_INFO "MXC_V4L: Slave: %s, Master: %s\n", slave->name, slave->u.slave->master->name);
+	printk(KERN_INFO "MXC_V4L: Slave: %s, Master: %s\n", slave->name, slave->u.slave->master->name);
 
 	if (slave == NULL) {
 		pr_err("ERROR: v4l2 capture: slave parameter not valid.\n");
@@ -3451,6 +3374,7 @@ static int mxc_v4l2_master_attach(struct v4l2_int_device *slave)
 		return -1;
 	}
 	cam->sensor = slave;
+	printk(KERN_INFO "MXC_V4L: Camera sensor: %p, Camera: %p\n", cam->sensor, cam);
 
 	if (cam->sensor_index < MXC_SENSOR_NUM) {
 		cam->all_sensors[cam->sensor_index] = slave;

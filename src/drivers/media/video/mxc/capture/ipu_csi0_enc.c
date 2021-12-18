@@ -253,7 +253,7 @@ static int csi_enc_enabling_tasks(void *private)
 	    PAGE_ALIGN(cam->v2f.fmt.pix.sizeimage);
 	cam->dummy_frame.buffer.m.offset = cam->dummy_frame.paddress;
 #endif
-	/* Set static DMA address fir CSI IPU */
+	/* Set static DMA address for CSI IPU */
 	cam->dummy_frame.paddress = PARALLAX_CSI_MEM_START+(PARALLAX_DMA_BUF_SIZE*cam->csi);
 	cam->dummy_frame.vaddress = ioremap(cam->dummy_frame.paddress, PARALLAX_DMA_BUF_SIZE);
         if (cam->dummy_frame.vaddress == 0) {

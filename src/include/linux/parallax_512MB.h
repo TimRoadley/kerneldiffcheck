@@ -1,0 +1,53 @@
+#ifndef __PARALLAX_H__
+#define __PARALLAX_H__
+
+#ifndef PLAT_PHYS_OFFSET
+   #define PLAT_PHYS_OFFSET        UL(0x10000000)
+#endif
+
+/* Offset for boards with 256MB of mem */
+#if defined(CONFIG_MXC_CAMERA_OV5653) || defined(CONFIG_MXC_CAMERA_OV5653_MODULE)
+// 512MB memory maps
+#define PARALLAX_GPU_MEM_OFFS   (464*1024*1024) 	// GPU processing memory = 48MB
+#define PARALLAX_DMA_MEM_OFFS   (304*1024*1024) 	// 4 buffers * PARALLAX_DMA_BUF_SIZE per camera - 
+							// - 2 ping-pong frame acquisition DMA buffers
+							// - 1 Image conversion DMA buffer
+							// - 1 Frame buffer for GPU
+#define PARALLAX_CSI_MEM_OFFS   (264*1024*1024) 	// Two buffers for CSI = PARALLAX_DMA_BUF_SIZE each
+#define PARALLAX_VPU_MEM_OFFS   (254*1024*1024) 	// VPU processing memory 16 buffers *512K+ = 10MB
+#define PARALLAX_LVPU_MEM_OFFS  (250*1024*1024) 	// LVPU processing 2 * 2MB
+#else
+#define PARALLAX_GPU_MEM_OFFS   (224*1024*1024) 
+#define PARALLAX_DMA_MEM_OFFS   (196*1024*1024) 
+#define PARALLAX_CSI_MEM_OFFS   (176*1024*1024) 
+#define PARALLAX_VPU_MEM_OFFS   (166*1024*1024) 
+#define PARALLAX_LVPU_MEM_OFFS  (162*1024*1024) 
+#endif
+
+/* Offset for boards with 256MB of mem */
+//#define PARALLAX_DMA_MEM_OFFS   (180*1024*1024)
+
+/* Offset with boards with 512MB of mem */
+/*
+#define PARALLAX_DMA_MEM_OFFS   (400*1024*1024)
+*/
+#if defined(CONFIG_MXC_CAMERA_OV5653) || defined(CONFIG_MXC_CAMERA_OV5653_MODULE)
+#define PARALLAX_DMA_BUF_SIZE   (20*1024*1024) 
+#else
+#define PARALLAX_DMA_BUF_SIZE   (10*1024*1024)
+#endif
+#define PARALLAX_VPU_BUF_SIZE   (128*4096 + 4096*16)
+#define PARALLAX_LVPU_BUF_SIZE   (2*1024*1024)
+#define PARALLAX_GPU_BUF_SIZE   (48*1024*1024)
+#define PARALLAX_DMA_MEM_START  (PLAT_PHYS_OFFSET+PARALLAX_DMA_MEM_OFFS)
+#define PARALLAX_CSI_MEM_START  (PLAT_PHYS_OFFSET+PARALLAX_CSI_MEM_OFFS)
+#define PARALLAX_VPU_MEM_START  (PLAT_PHYS_OFFSET+PARALLAX_VPU_MEM_OFFS)
+#define PARALLAX_LVPU_MEM_START  (PLAT_PHYS_OFFSET+PARALLAX_LVPU_MEM_OFFS)
+#define PARALLAX_GPU_MEM_START  (PLAT_PHYS_OFFSET+PARALLAX_GPU_MEM_OFFS)
+
+#define PARALLAX_VPU_BUF_NUM	16
+#define PARALLAX_LVPU_BUF_NUM	2
+#define V4L2_BUF_TYPE_DMAMAP 0xaa55
+#define M3_VPU_BUFFER_IC_ID 2
+
+#endif

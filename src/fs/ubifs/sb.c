@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/math64.h>
+#include <linux/delay.h>
 
 /*
  * Default journal size in logical eraseblocks as a percent of total
@@ -697,6 +698,7 @@ static int fixup_free_space(struct ubifs_info *c)
 	int lnum, err = 0;
 	struct ubifs_lprops *lprops;
 
+
 	ubifs_get_lprops(c);
 
 	/* Fixup LEBs in the master area */
@@ -740,6 +742,7 @@ static int fixup_free_space(struct ubifs_info *c)
 			goto out;
 	}
 
+
 	/* Fixup LEBs in the main area */
 	for (lnum = c->main_first; lnum < c->leb_cnt; lnum++) {
 		lprops = ubifs_lpt_lookup(c, lnum);
@@ -782,6 +785,8 @@ int ubifs_fixup_free_space(struct ubifs_info *c)
 	ubifs_assert(!c->ro_mount);
 
 	ubifs_msg("start fixing up free space");
+
+	ubifs_msg("ubifs test message 0");
 
 	err = fixup_free_space(c);
 	if (err)

@@ -68,13 +68,11 @@ void arch_reset(char mode, const char *cmd)
 		wcr_enable = (1 << 2);
         printk(KERN_INFO "Arch Reset: Write watchdog: %X\n", wcr_enable);
         // Test LDO enable
-        printk(KERN_INFO "WD1 Base control reg: %X\n", __raw_readw(wdog_base));
-        // Fix warm reboot problem. THe warm reboot bit should be OFF
         srcreg = __raw_readw(IO_ADDRESS(SRC_BASE_ADDR));
-        printk(KERN_INFO "Original SRC control reg: %X\n", srcreg);
+        printk(KERN_INFO "WD1 Base control reg: %X\n", __raw_readw(wdog_base));
+        printk(KERN_INFO "SRC control reg: %X\n", srcreg);
+        // Fix warm reboot problem. THe warm reboot bit should be OFF
         srcreg &= ~0x01;
-        // Test - reset everything
-//        srcreg = 0xD3E; // reset every subsystem before resetting cpu
 	__raw_writew(srcreg, IO_ADDRESS(SRC_BASE_ADDR));
 	__raw_writew(wcr_enable, wdog_base);
 //        printk(KERN_INFO "Base control reg after reset: %X\n", __raw_readw(wdog_base));

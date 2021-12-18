@@ -1954,6 +1954,7 @@ struct v4l2_dbg_chip_ident {
 #define VIDIOC_G_ENC_INDEX       _IOR('V', 76, struct v4l2_enc_idx)
 #define VIDIOC_ENCODER_CMD      _IOWR('V', 77, struct v4l2_encoder_cmd)
 #define VIDIOC_TRY_ENCODER_CMD  _IOWR('V', 78, struct v4l2_encoder_cmd)
+#define VIDIOC_STREAMOFF_LAZY	 _IOW('V', 79, int)
 #endif
 
 #if 1
@@ -1982,8 +1983,6 @@ struct v4l2_dbg_chip_ident {
 
 /* Parallax specific snapshot*/
 #define VIDIOC_SNAPSHOT		_IOWR('V', 93, struct mxcv4loverlay_kernel_entry)
-#define VIDIOC_STREAMON_LAZY	 _IOW('V', 94, int)
-#define VIDIOC_STREAMOFF_LAZY	 _IOW('V', 95, int)
 
 /* Reminder: when adding new ioctls please add support for them to
    drivers/media/video/v4l2-compat-ioctl32.c as well! */

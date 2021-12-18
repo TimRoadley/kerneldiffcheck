@@ -56,6 +56,8 @@
 #define MXC_VPU_MAJOR 252
 #define MXC_VPU_ASIGNED_DMA_BUFFERS 6
 
+#define USE_PA_DMA_MEM_MANAGER 1
+
 /* Define one new pgprot which combined uncached and XN(never executable) */
 #define pgprot_noncachedxn(prot) \
 	__pgprot_modify(prot, L_PTE_MT_MASK, L_PTE_MT_UNCACHED | L_PTE_XN)
@@ -107,6 +109,7 @@ static int irq_status;
 static int codec_done;
 static wait_queue_head_t vpu_queue;
 
+
 #ifdef CONFIG_SOC_IMX6Q
 #define MXC_VPU_HAS_JPU
 #endif
@@ -114,6 +117,7 @@ static wait_queue_head_t vpu_queue;
 #ifdef MXC_VPU_HAS_JPU
 static int vpu_jpu_irq;
 #endif
+
 
 static unsigned int regBk[64];
 static struct regulator *vpu_regulator;
@@ -140,24 +144,11 @@ static struct vpu_mem_desc vpu_dma_free_pool[MXC_VPU_ASIGNED_DMA_BUFFERS] = {
 static void parallax_vpu_fill_dma_buffers(void)
 {
     int i;
-    /* We cannot allocate more than VPU DMA buffer size. check it here */
-    for(i = 0; i < MXC_VPU_ASIGNED_DMA_BUFFERS; i++) {
-        vpu_dma_free_pool[i].cpu_addr = (unsigned long)ioremap(vpu_dma_free_pool[i].phy_addr, 
-                                      PAGE_ALIGN(vpu_dma_free_pool[i].size));
-        if(vpu_dma_free_pool[i].cpu_addr == 0) {
-            printk(KERN_INFO "VPU driver: ERROR: Unable to map CPU addr for: %X, size: %d\n",
-                   vpu_dma_free_pool[i].phy_addr, PAGE_ALIGN(vpu_dma_free_pool[i].size));
-        }
-    }
+    memset(&dma_free_pool[0], 0x00, sizeof(struct vpu_mem_desc)*PARALLAX_VPU_BUF_NUM);
     for(i = 0; i < PARALLAX_VPU_BUF_NUM; i++) {
         dma_free_pool[i].phy_addr = PARALLAX_VPU_MEM_START + i*PARALLAX_VPU_BUF_SIZE;
         dma_free_pool[i].size = PARALLAX_VPU_BUF_SIZE;
-        dma_free_pool[i].cpu_addr = (unsigned long)ioremap(dma_free_pool[i].phy_addr, 
-                                      PAGE_ALIGN(dma_free_pool[i].size));
-        if(dma_free_pool[i].cpu_addr == 0) {
-            printk(KERN_INFO "VPU driver: ERROR: Unable to map CPU addr for: %X, size: %d\n",
-                   dma_free_pool[i].phy_addr, PAGE_ALIGN(dma_free_pool[i].size));
-        }
+        dma_free_pool[i].flags = 0;
     }
 }
 
@@ -169,8 +160,10 @@ static struct vpu_mem_desc *parallax_vpu_alloc_dma_buf(u32 size)
     if(size > PARALLAX_VPU_BUF_SIZE) {
         for(i = 0; i < MXC_VPU_ASIGNED_DMA_BUFFERS; i++) {
             if((vpu_dma_free_pool[i].flags == 0) && (vpu_dma_free_pool[i].size == size)) {
-//	        printk(KERN_INFO "VPU driver: Found Internal VPU DMA location: %X for size: %d\n", 
-//                       (u32)vpu_dma_free_pool[i].phy_addr, size);
+#ifdef IMX_VPU_DEBUG
+	        printk(KERN_INFO "++++mxc_vpu: Found Internal VPU DMA location: %d, addr: %X for size: %d\n", 
+                       i, (u32)vpu_dma_free_pool[i].phy_addr, size);
+#endif
                 vpu_dma_free_pool[i].flags = (VPU_MEM_DESCR_DMAMAP | VPU_MEM_DESCR_VPU_DMA);
                 return &vpu_dma_free_pool[i];
             } 
@@ -178,9 +171,11 @@ static struct vpu_mem_desc *parallax_vpu_alloc_dma_buf(u32 size)
     }
     for(i = 0; i < PARALLAX_VPU_BUF_NUM; i++) {
         if(dma_free_pool[i].flags == 0) {
-//	    printk(KERN_INFO "VPU driver: Found DMA location: %X for size: %d\n", (u32)dma_free_pool[i].phy_addr, size);
-	    dma_free_pool[i].flags = VPU_MEM_DESCR_DMAMAP;
-            return &dma_free_pool[i];
+#ifdef IMX_VPU_DEBUG
+	    	printk(KERN_INFO "++++mxc_vpu: Found DMA location: %d, addr: %X for size: %d\n", i, (u32)dma_free_pool[i].phy_addr, size);
+#endif
+	    	dma_free_pool[i].flags = VPU_MEM_DESCR_DMAMAP;
+            	return &dma_free_pool[i];
 	}
     }	
     return NULL;
@@ -194,9 +189,15 @@ static void parallax_vpu_free_dma_buf(dma_addr_t addr, u32 flags)
         if(flags & VPU_MEM_DESCR_VPU_DMA) {
             for(i = 0; i < MXC_VPU_ASIGNED_DMA_BUFFERS; i++) {
                 if(vpu_dma_free_pool[i].phy_addr == addr) {
-//                    printk(KERN_INFO "VPU driver: Clearing Internal VPU DMA location: %X for size: %d\n", 
-//                           (u32)vpu_dma_free_pool[i].phy_addr, vpu_dma_free_pool[i].size);
+#ifdef IMX_VPU_DEBUG
+                    printk(KERN_INFO "++++mxc_vpu: Clearing Internal VPU DMA location: %d, addr: %X for size: %d\n", 
+                           i, (u32)vpu_dma_free_pool[i].phy_addr, vpu_dma_free_pool[i].size);
+#endif
                     vpu_dma_free_pool[i].flags = 0;
+					if(vpu_dma_free_pool[i].cpu_addr != 0) {
+						iounmap((void *)(vpu_dma_free_pool[i].cpu_addr));
+						vpu_dma_free_pool[i].cpu_addr = 0;
+					}                    
                     return;
                 }
             }
@@ -204,8 +205,14 @@ static void parallax_vpu_free_dma_buf(dma_addr_t addr, u32 flags)
         else {
             for(i = 0; i < PARALLAX_VPU_BUF_NUM; i++) {
                 if(dma_free_pool[i].phy_addr == addr) {
-//                    printk(KERN_INFO "++++mxc_vpu: clearing Parallax DMA buf idx: %d, addr: %X\n", i, addr);
+#ifdef IMX_VPU_DEBUG
+                    printk(KERN_INFO "++++mxc_vpu: clearing Parallax DMA location: %d, addr: %X\n", i, addr);
+#endif
     	            dma_free_pool[i].flags = 0;
+					if(dma_free_pool[i].cpu_addr != 0) {
+						iounmap((void *)(dma_free_pool[i].cpu_addr));
+						dma_free_pool[i].cpu_addr = 0;
+					}                    
                     return;
 	        }
             }	
@@ -228,28 +235,35 @@ static int vpu_alloc_dma_buffer(struct vpu_mem_desc *mem)
     struct vpu_mem_desc *vpu_mem = NULL;
 //    printk(KERN_INFO "++++mxc_vpu: allocating coherent buf, size: %d\n", mem->size);
     /* First, try to use DMA buffer pool */
+#ifdef USE_PA_DMA_MEM_MANAGER
     if((vpu_mem = parallax_vpu_alloc_dma_buf(PAGE_ALIGN(mem->size))) != NULL) {
- //   	printk(KERN_INFO "++++mxc_vpu: got Parallax DMA buffer: %X\n", vpu_mem->phy_addr);
-	if((void *)(vpu_mem->cpu_addr) == NULL) {
-            printk(KERN_ERR "ERROR: Physical memory map is empty error!\n");
+        vpu_mem->cpu_addr = (unsigned long)ioremap(vpu_mem->phy_addr, PAGE_ALIGN(vpu_mem->size));
+        if(vpu_mem->cpu_addr == 0) {
+            printk(KERN_INFO "VPU driver: ERROR: Unable to map CPU addr for: %X, size: %d\n",
+                   vpu_mem->phy_addr, PAGE_ALIGN(vpu_mem->size));
             return -1;
-	}
+        }        
         *mem = *vpu_mem;
     }
     else {
-	mem->cpu_addr = (unsigned long)
+#endif
+ 	    mem->cpu_addr = (unsigned long)
 	    dma_alloc_coherent(NULL, PAGE_ALIGN(mem->size),
 			       (dma_addr_t *) (&mem->phy_addr),
 			       GFP_DMA | GFP_KERNEL);
-	pr_debug("[ALLOC] mem alloc cpu_addr = 0x%x\n", mem->cpu_addr);
-//	printk(KERN_INFO "+++++mxc_vpu: [ALLOC] mem alloc cpu_addr = 0x%x, size: %d\n", 
-//               mem->cpu_addr, mem->size);
-	if ((void *)(mem->cpu_addr) == NULL) {
-		printk(KERN_ERR "Physical memory allocation error!\n");
-		return -1;
-	}
-	mem->flags = VPU_MEM_DESCR_ALLOC;
+		pr_debug("[ALLOC] mem alloc cpu_addr = 0x%x\n", mem->cpu_addr);
+#ifdef IMX_VPU_DEBUG
+		printk(KERN_INFO "+++++mxc_vpu: [ALLOC] mem alloc cpu_addr = 0x%x, size: %d\n", 
+               mem->cpu_addr, mem->size);
+#endif
+		if ((void *)(mem->cpu_addr) == NULL) {
+			printk(KERN_ERR "Physical memory allocation error!\n");
+			return -1;
+		}
+		mem->flags = VPU_MEM_DESCR_ALLOC;
+#ifdef USE_PA_DMA_MEM_MANAGER
     }
+#endif
     return 0;
 }
 
@@ -258,19 +272,27 @@ static int vpu_alloc_dma_buffer(struct vpu_mem_desc *mem)
  */
 static void vpu_free_dma_buffer(struct vpu_mem_desc *mem)
 {
-//        printk(KERN_INFO "+++++Freeing DMA buffer: phy: %X, cpu: 0x%x, size: %d\n", 
-//		mem->phy_addr, mem->cpu_addr, mem->size);
+#ifdef IMX_VPU_DEBUG
+        printk(KERN_INFO "+++++Freeing DMA buffer: phy: %X, cpu: 0x%x, size: %d, flags: 0x%x\n", 
+		mem->phy_addr, mem->cpu_addr, mem->size, mem->flags);
+#endif
+#ifdef USE_PA_DMA_MEM_MANAGER
 	if (mem->flags != 0) {
 	    /* Check if we've got custom DMA allocation */
 	    if(mem->flags & (VPU_MEM_DESCR_DMAMAP | VPU_MEM_DESCR_VPU_DMA)) {
-		parallax_vpu_free_dma_buf(mem->phy_addr, mem->flags);
+			parallax_vpu_free_dma_buf(mem->phy_addr, mem->flags);
 	    }
-	    else {
-//                printk(KERN_INFO "++++mxc_vpu: freeing dynamic DMA buf\n");
-		dma_free_coherent(0, PAGE_ALIGN(mem->size),
+        else {
+#endif
+#ifdef IMX_VPU_DEBUG
+            printk(KERN_INFO "++++mxc_vpu: [FREE] freeing dynamic DMA buf, cpuaddr: 0x%x\n", mem->cpu_addr);
+#endif
+			dma_free_coherent(0, PAGE_ALIGN(mem->size),
 				  (void *)mem->cpu_addr, mem->phy_addr);
+#ifdef USE_PA_DMA_MEM_MANAGER
 	    }
 	}
+#endif
 }
 
 /*!
@@ -282,10 +304,12 @@ static int vpu_free_buffers(void)
 	struct memalloc_record *rec, *n;
 	struct vpu_mem_desc mem;
 
-//        printk(KERN_INFO "++++mxc_vpu: Freeing ALL dynamic DMA buffers\n");
+#ifdef IMX_VPU_DEBUG
+    printk(KERN_INFO "++++mxc_vpu: Freeing ALL dynamic DMA buffers\n");
+#endif
 	list_for_each_entry_safe(rec, n, &head, list) {
 		mem = rec->mem;
-		if (mem.cpu_addr != 0) {
+		if (mem.phy_addr != 0) {
 			vpu_free_dma_buffer(&mem);
 			pr_debug("[FREE] freed paddr=0x%08X\n", mem.phy_addr);
 			/* delete from list */
@@ -363,7 +387,9 @@ static irqreturn_t vpu_jpu_irq_handler(int irq, void *dev_id)
  */
 bool vpu_is_valid_phy_memory(u32 paddr)
 {
+#ifdef IMX_VPU_DEBUG
     printk("++++checking PHY mem: 0x%X, top: 0x%X\n", paddr, top_address_DRAM);
+#endif
 	if (paddr > top_address_DRAM)
 		return false;
 
@@ -377,7 +403,7 @@ bool vpu_is_valid_phy_memory(u32 paddr)
  */
 static int vpu_open(struct inode *inode, struct file *filp)
 {
-
+        printk(KERN_INFO "-----MX VPU OPEN -----\n");
 	mutex_lock(&vpu_data.lock);
 
 	if (open_count++ == 0) {
@@ -430,7 +456,7 @@ static long vpu_ioctl(struct file *filp, u_int cmd,
                         mutex_lock(&vpu_data.lock);
 			ret = vpu_alloc_dma_buffer(&(rec->mem));
                         mutex_unlock(&vpu_data.lock);
-			if (ret == -1) {
+			if (ret == -1 || rec->mem.phy_addr == 0) {
 				kfree(rec);
 				printk(KERN_ERR
 				       "Physical memory allocation error!\n");
@@ -463,12 +489,12 @@ static long vpu_ioctl(struct file *filp, u_int cmd,
 			mutex_lock(&vpu_data.lock);
 
 			pr_debug("[FREE] mem freed cpu_addr = 0x%x\n",
-				 vpu_mem.cpu_addr);
-			if (vpu_mem.flags != 0) {
+				 vpu_mem.phy_addr);
+			if (vpu_mem.phy_addr != 0) {
 				vpu_free_dma_buffer(&vpu_mem);
 			}
 			list_for_each_entry_safe(rec, n, &head, list) {
-				if (rec->mem.cpu_addr == vpu_mem.cpu_addr) {
+				if (rec->mem.phy_addr == vpu_mem.phy_addr) {
 					/* delete from list */
 					list_del(&rec->list);
 					kfree(rec);
@@ -481,9 +507,9 @@ static long vpu_ioctl(struct file *filp, u_int cmd,
         case VPU_IOC_DMAMEM_FREE:
 		{
 			/* This forces to free DMA memory */
-                        mutex_lock(&vpu_data.lock);
-			//vpu_free_buffers();
-                        mutex_unlock(&vpu_data.lock);
+                mutex_lock(&vpu_data.lock);
+		vpu_free_buffers();
+                mutex_unlock(&vpu_data.lock);
 			break;
 		}
 	case VPU_IOC_WAIT4INT:
@@ -691,8 +717,20 @@ static int vpu_release(struct inode *inode, struct file *filp)
 {
 	int i;
 	unsigned long timeout;
+        struct vpu_mem_desc mem;
+         struct memalloc_record *rec, *n;
 
+        printk(KERN_INFO "-----MX VPU RELEASE -----\n");
 	mutex_lock(&vpu_data.lock);
+        
+        printk(KERN_INFO "[VPU DMA BUFS INFO]\n");
+
+        list_for_each_entry_safe(rec, n, &head, list) {
+                mem = rec->mem;
+                printk(KERN_INFO " [buf: phy: %X, cpu: %X, flags: %X, size: %d]\n",
+                  mem.phy_addr, mem.cpu_addr, mem.flags, mem.size);
+        }
+
 
 	if (open_count > 0 && !(--open_count)) {
 
@@ -1181,8 +1219,7 @@ static int __init vpu_init(void)
 {
         int ret = 0;
 
-	memset(&dma_free_pool[0], 0x00, sizeof(struct vpu_mem_desc)*PARALLAX_VPU_BUF_NUM);
-        parallax_vpu_fill_dma_buffers();
+    parallax_vpu_fill_dma_buffers();
 
 	ret = platform_driver_register(&mxcvpu_driver);
 

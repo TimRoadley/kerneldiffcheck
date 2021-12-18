@@ -739,6 +739,7 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 		.platform_data = (void *)&adv7180_data,
 		.irq = gpio_to_irq(IMX_GPIO_NR(5, 0)),  /* EIM_WAIT */
 	},
+#if defined(CONFIG_MXC_CAMERA_OV5642) || defined(CONFIG_MXC_CAMERA_OV5653) || defined(CONFIG_MXC_CAMERA_OV5642_MODULE) || defined(CONFIG_MXC_CAMERA_OV5653_MODULE)
         {
 #if defined(CONFIG_MXC_CAMERA_OV5653) || defined(CONFIG_MXC_CAMERA_OV5653_MODULE)
                 I2C_BOARD_INFO("ov5653_1", 0x36),
@@ -747,6 +748,7 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 #endif
                 .platform_data = (void *)&ov5642_cam1_data,
         },
+#endif
 };
 
 static void usbotg_vbus(bool on)
@@ -877,9 +879,9 @@ static const struct flexcan_platform_data
 };
 
 static struct viv_gpu_platform_data imx6_gpu_pdata __initdata = {
-        .reserved_mem_base = PARALLAX_GPU_MEM_START,
+//        .reserved_mem_base = PARALLAX_GPU_MEM_START,
+//	.reserved_mem_size = 0x4000000,
 	.reserved_mem_size = SZ_32M,
-//	.reserved_mem_size = SZ_128M,
 };
 
 static struct imx_asrc_platform_data imx_asrc_data = {
@@ -890,9 +892,12 @@ static struct imx_asrc_platform_data imx_asrc_data = {
 static struct ipuv3_fb_platform_data fb_data[] = {
 	{ /*fb0*/
 	.disp_dev = "ldb",
-	.interface_pix_fmt = IPU_PIX_FMT_RGB666,
-	.mode_str = "LDB-XGA",
-	.default_bpp = 16,
+//	.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+	.interface_pix_fmt = IPU_PIX_FMT_RGB24,
+	.mode_str = "LDB-VGA",
+//	.mode_str = "LDB-XGA",
+	.default_bpp = 32,
+//	.default_bpp = 16,
 	.int_clk = false,
 	}, {
 	.disp_dev = "lcd",
@@ -1426,7 +1431,7 @@ static struct platform_device parallax_leds_pwd = {
 static struct platform_device parallax_src_pwd = {
         .name   = "parallax_src",
         .dev    = {
-        	.platform_data  = NULL,
+                .platform_data  = NULL,
         },
 };
 
@@ -1506,6 +1511,33 @@ static void __init board_init(void)
 	if (isn6)
 		imx6q_add_imx_uart(2, &mx6_arm2_uart2_data);
 
+
+// TEST upper memory access
+        printk(KERN_INFO "Accessing UPPER memory...\n");
+	if(false) {
+            unsigned int idx = 0;
+            unsigned int checkval;
+	    char *mem_base = ioremap(PARALLAX_GPU_MEM_START, 0x4000000);
+	    unsigned int *tmp_base = (unsigned int *)mem_base;
+	    if(mem_base == NULL) {
+        	printk(KERN_INFO "ERROR: Unable to map upper mem base: %X\n", PARALLAX_GPU_MEM_START);
+	        return;
+    	    }
+            for(idx = 0; idx < (0x4000000>>2); idx++) {
+		*tmp_base = idx;
+                checkval = *tmp_base;
+                if(checkval != idx) {
+        	    printk(KERN_INFO "ERROR: Unable to write value. Read: %X. Expected: %X\n", checkval, idx);
+		}
+                tmp_base++;
+	    }
+            printk(KERN_INFO "Memory is tested for %d longs\n", (0x4000000>>2));
+	
+            iounmap(mem_base);
+	}
+
+
+
 #if !(defined(CONFIG_MXC_CAMERA_OV5642) || defined(CONFIG_MXC_CAMERA_OV5653) || defined(CONFIG_MXC_CAMERA_OV5642_MODULE) || defined(CONFIG_MXC_CAMERA_OV5653_MODULE))
 	imx6q_add_imx_uart(3, &mx6_arm2_uart3_data);
 	imx6q_add_imx_uart(4, &mx6_arm2_uart4_data);
@@ -1529,9 +1561,11 @@ static void __init board_init(void)
 	for (i = 0; i < j; i++)
 		imx6q_add_ipuv3fb(i, &fb_data[i]);
 
+
+
 //	imx6q_add_vdoa();
 //	imx6q_add_lcdif(&lcdif_data);
-//	imx6q_add_ldb(&ldb_data);
+	imx6q_add_ldb(&ldb_data);
 //	imx6q_add_v4l2_output(0);
 //	imx6q_add_bt656(&bt656_data);
 
@@ -1581,7 +1615,8 @@ static void __init board_init(void)
 	imx6q_add_pm_imx(0, &pm_data);
 	imx6q_add_sdhci_usdhc_imx(2, &sd3_data);
 	imx6q_add_sdhci_usdhc_imx(3, &sd4_data);
-//	imx_add_viv_gpu(&imx6_gpu_data, &imx6_gpu_pdata);
+
+	imx_add_viv_gpu(&imx6_gpu_data, &imx6_gpu_pdata);
 
 //	init_usb();
 //	if (cpu_is_mx6q())
@@ -1687,7 +1722,7 @@ static void __init board_init(void)
 	// Turn ON LED power and register LED platform device
 	parallax_led_init();
 	platform_device_register(&parallax_leds_pwd);
-	platform_device_register(&parallax_src_pwd);
+        platform_device_register(&parallax_src_pwd);
 
 	printk(KERN_INFO "PARK ASSIST PARALLAX BOARD INITIALIZATION COMPLETED\n");
 }
@@ -1714,6 +1749,9 @@ static void __init reserve(void)
 {
 #if defined(CONFIG_MXC_GPU_VIV) || defined(CONFIG_MXC_GPU_VIV_MODULE)
 	phys_addr_t phys;
+/* GPU memory is reserved using our own memory managmenet scheme which allocates chunks of pohysical memory on start */
+/* Look at include/linux/parallax.h for complete map */
+
 
 	if (imx6_gpu_pdata.reserved_mem_size) {
 		phys = memblock_alloc_base(imx6_gpu_pdata.reserved_mem_size,
@@ -1721,6 +1759,7 @@ static void __init reserve(void)
 		memblock_remove(phys, imx6_gpu_pdata.reserved_mem_size);
 		imx6_gpu_pdata.reserved_mem_base = phys;
 	}
+
 #endif
 }
 

@@ -1,0 +1,7 @@
+config PARALLAX_VIRTFB
+	tristate "Parallax Virtual Frame Buffer"
+	---help---
+	 This driver emulates frame buffer for GPU direct memory 
+	 rendering.
+
+

@@ -1,0 +1,3 @@
+#!/bin/bash
+#cp config.parallax .config
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- -C /root/Projects/m3-projects/kernel/linux-kernel.parallax/src M=`pwd`

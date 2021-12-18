@@ -196,8 +196,6 @@ static const char *v4l2_ioctls[] = {
 	[_IOC_NR(VIDIOC_DQBUF)]            = "VIDIOC_DQBUF",
 	[_IOC_NR(VIDIOC_STREAMON)]         = "VIDIOC_STREAMON",
 	[_IOC_NR(VIDIOC_STREAMOFF)]        = "VIDIOC_STREAMOFF",
-	[_IOC_NR(VIDIOC_STREAMON_LAZY)]    = "VIDIOC_STREAMON_LAZY",
-	[_IOC_NR(VIDIOC_STREAMOFF_LAZY)]   = "VIDIOC_STREAMOFF_LAZY",
 	[_IOC_NR(VIDIOC_G_PARM)]           = "VIDIOC_G_PARM",
 	[_IOC_NR(VIDIOC_S_PARM)]           = "VIDIOC_S_PARM",
 	[_IOC_NR(VIDIOC_G_STD)]            = "VIDIOC_G_STD",
@@ -589,8 +587,6 @@ static long __video_do_ioctl(struct file *file,
 		case VIDIOC_REQBUFS:
 		case VIDIOC_STREAMON:
 		case VIDIOC_STREAMOFF:
-		case VIDIOC_STREAMON_LAZY:
-		case VIDIOC_STREAMOFF_LAZY:
 			ret = v4l2_prio_check(vfd->prio, vfh->prio);
 			if (ret)
 				goto exit_prio;
